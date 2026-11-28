@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LifeOS v2.14.86</title>
+<title>LifeOS v2.14.87</title>
 <meta name="theme-color" content="#221c14" />
 <meta name="application-name" content="LifeOS" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -8746,7 +8746,7 @@ const DEFAULT_TASKS=[
 ];
 const TEST_PACK_VERSION='v296_ideal_day_schedule';
 const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
-const APP_VERSION='2.14.86';
+const APP_VERSION='2.14.87';
 const BACKUP_SCHEMA_VERSION=1;
 const K={tasks:'lifeos_v24_tasks',logs:'lifeos_v24_logs',tags:'lifeos_v24_tags',tagProgressOrder:'lifeos_v24_tag_progress_order',foods:'lifeos_v24_foods',units:'lifeos_v24_units',settings:'lifeos_v24_settings',dayCategories:'lifeos_v24_day_categories',rules:'lifeos_v24_life_rules',engPhrases:'lifeos_eng_phrases',engRoleplays:'lifeos_eng_roleplays',engStories:'lifeos_eng_stories',engNetworking:'lifeos_eng_networking',engSelfPresentation:'lifeos_eng_self_presentation',careerEvidence:'lifeos_career_evidence',careerStories:'lifeos_career_stories',careerOpportunities:'lifeos_career_opportunities',careerProfile:'lifeos_career_profile',safetyMeta:'lifeos_safety_meta',preImportSnapshot:'lifeos_safety_preimport_snapshot',learning:'lifeos_learning_logs_v1',masterSyncMeta:'lifeos_master_sync_meta_v1',idealSideSections:'lifeos_ideal_side_sections_v1',uiPreferences:'lifeos_ui_preferences_v1',pinnedTaskFilter:'lifeos_pinned_task_filter_v2',planProjectCollapse:'lifeos_plan_project_collapse_state_v1',journalEntries:'lifeos_journal_entries_v1'};
 const LIFEOS_STORAGE_MANIFEST=[
@@ -12630,7 +12630,7 @@ window.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.body.classL
 <script id="lifeos-pwa-bootstrap">
 (function () {
   'use strict';
-  const LIFEOS_SW_VERSION = '2.14.86';
+  const LIFEOS_SW_VERSION = '2.14.87';
   const RELOAD_KEY = 'lifeos_sw_reload_' + LIFEOS_SW_VERSION;
   let controllerReloading = false;
   if ('serviceWorker' in navigator) {
@@ -20570,6 +20570,49 @@ document.addEventListener('keydown',resumeKeyboard,true);
         throw new Error("The sign-in code expired. Tap Sign in with Google to get a new one.");
       } finally { dialog.close(); }
     }
+    function chooseFirstSync(parsed) {
+      /* Same overlay and card styles as the app's own confirmation dialog. */
+      return new Promise(function (resolve) {
+        const raw = parsed.raw, driveTasks = masterTaskRows(raw.data && raw.data.tasks).length,
+          localTasks = masterTaskRows(syncData().tasks).length,
+          when = raw.updatedAt ? masterSyncFriendlyDate(raw.updatedAt, "") : "";
+        const overlay = document.createElement("div");
+        overlay.className = "lifeos-confirm-overlay lifeos-google-first-sync";
+        const card = document.createElement("section");
+        card.className = "lifeos-confirm-card";
+        card.setAttribute("role", "dialog");
+        card.setAttribute("aria-modal", "true");
+        const kicker = document.createElement("div");
+        kicker.className = "lifeos-confirm-kicker";
+        kicker.textContent = "Google Drive backup";
+        const title = document.createElement("h3");
+        title.textContent = "Google Drive already has LifeOS data";
+        const message = document.createElement("div");
+        message.className = "lifeos-confirm-message";
+        message.textContent = "Google Drive: " + driveTasks + " tasks" + (when ? ", saved " + when : "") + ((raw.writer && raw.writer.label) ? " from " + raw.writer.label : "") + ".\nThis device: " + localTasks + " tasks.\n\nChoose what to keep. This device saves an undo point first, and Google Drive keeps earlier versions of its copy.";
+        const actions = document.createElement("div");
+        actions.className = "lifeos-confirm-actions";
+        actions.style.cssText = "flex-direction:column;align-items:stretch;gap:8px";
+        function button(label, value, cls) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = cls;
+          b.textContent = label;
+          b.setAttribute("data-first-sync", value || "cancel");
+          b.addEventListener("click", function () { overlay.remove(); resolve(value); });
+          return b;
+        }
+        actions.append(
+          button("Use Google Drive data (new device)", "drive", "lifeos-confirm-proceed"),
+          button("Merge both", "merge", "lifeos-confirm-cancel"),
+          button("Keep this device's data (replaces the Drive copy)", "device", "lifeos-confirm-cancel"),
+          button("Cancel", null, "lifeos-confirm-cancel"),
+        );
+        card.append(kicker, title, message, actions);
+        overlay.append(card);
+        document.body.append(overlay);
+      });
+    }
     async function signIn() {
       if (signInBusy) return false;
       signInBusy = true;
@@ -20583,8 +20626,29 @@ document.addEventListener('keydown',resumeKeyboard,true);
         setMasterFileStatus(fileStatus());
         setSyncStatus({ checking: true, verifying: false, ready: false, error: "", conflict: false, identityMismatch: false, masterMissing: false, needsPairing: false, needsSetup: false, fileName: GOOGLE_FILE_LABEL });
         const existing = await read();
-        if (existing.found) await runMasterSyncCheck("master-file-selected", { identitySetup: true });
-        else {
+        if (existing.found) {
+          const parsed = parseMasterPackage(existing.content), meta = readSyncMeta(),
+            remoteId = String(parsed.raw.masterId || ""),
+            sameLineage = !!meta.masterId && String(meta.masterId) === remoteId,
+            sameData = String((parsed.raw.integrity && parsed.raw.integrity.hash) || "") === localSyncHash();
+          if (sameLineage || sameData) await runMasterSyncCheck("master-file-selected", { identitySetup: true });
+          else {
+            /* Drive already holds LifeOS data from another device: never overwrite either side silently. */
+            const choice = await chooseFirstSync(parsed);
+            if (!choice) {
+              writeState({ enabled: false });
+              cache = null;
+              await window.refreshLifeOSMasterFileStatus();
+              setSyncStatus({ checking: false, verifying: false, error: "" });
+              try { renderSafetyModal(); } catch (_) {}
+              return false;
+            }
+            try { if (typeof createPreImportSnapshot === "function") createPreImportSnapshot(); } catch (_) {}
+            if (choice === "drive") await applyMasterPackage(parsed, "google-first-sync");
+            else if (choice === "merge") { if (!(await window.lifeosMergeIntoSelectedMaster())) throw new Error("Could not merge with the Google Drive copy."); }
+            else await writeLocalMaster({ force: true, allowIdentityChange: true, masterIdOverride: remoteId, remoteResult: existing });
+          }
+        } else {
           /* First device to sign in: upload this device's data, keeping its master identity so
              devices already paired through the old shared file merge without a lineage prompt. */
           await writeLocalMaster({ force: true });
@@ -31834,7 +31898,7 @@ try{
   if(github)github.body='Open LifeOS only from its permanent HTTPS GitHub Pages address. GitHub Pages is deployed by the repository workflow at .github/workflows/deploy-pages.yml. Every release package must retain that workflow, push the approved root site to main, and let the workflow upload and deploy the Pages artifact. Updating main without the workflow does not update the public site. Never upload LifeOS-Master-Sync.json, Shadowing media or recordings to GitHub.';
  }
 }catch(_ ){}
-try{document.title='LifeOS v2.14.86'}catch(_ ){}
+try{document.title='LifeOS v2.14.87'}catch(_ ){}
 })();</script>
 </body>
 </html>
