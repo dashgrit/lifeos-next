@@ -8,11 +8,11 @@
 <h2>What the app stores</h2>
 <p>Your data (for example tasks, finances and journal entries) is stored on your own device in the browser or app. It is not sent to the developer or any third-party server.</p>
 <h2>Google Drive sync</h2>
-<p>If you choose to sign in with Google, LifeOS requests the drive.file and drive.appdata scopes. These let the app create and read only its own backup file in your Google Drive, and never your other files. Backups are encrypted on your device with a passphrase before upload. Google sign-in tokens stay in your browser.</p>
+<p>If you choose to sign in with Google, LifeOS requests the drive.file scope. It lets the app create and read only the files it made itself (a "LifeOS Sync" folder holding LifeOS-Master-Sync.json) in your own Google Drive, and never your other files. The sync file is stored in your Drive account like any other file you own; it is not sent anywhere else. Google sign-in tokens stay on your device and are never included in backups.</p>
 <h2>Sharing</h2>
 <p>LifeOS does not sell, share or analyse your data. LifeOS's use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.</p>
 <h2>Deleting data</h2>
-<p>Delete the backup file from your Google Drive, clear the app's site data, or revoke access at myaccount.google.com/permissions.</p>
+<p>Delete the "LifeOS Sync" folder from your Google Drive, clear the app's site data, or revoke access at myaccount.google.com/permissions.</p>
 <h2>Contact</h2>
 <p>dashgrit.hq@gmail.com</p>
 </body></html>
