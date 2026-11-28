@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LifeOS v2.14.85</title>
+<title>LifeOS v2.14.86</title>
 <meta name="theme-color" content="#221c14" />
 <meta name="application-name" content="LifeOS" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -8746,7 +8746,7 @@ const DEFAULT_TASKS=[
 ];
 const TEST_PACK_VERSION='v296_ideal_day_schedule';
 const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
-const APP_VERSION='2.14.85';
+const APP_VERSION='2.14.86';
 const BACKUP_SCHEMA_VERSION=1;
 const K={tasks:'lifeos_v24_tasks',logs:'lifeos_v24_logs',tags:'lifeos_v24_tags',tagProgressOrder:'lifeos_v24_tag_progress_order',foods:'lifeos_v24_foods',units:'lifeos_v24_units',settings:'lifeos_v24_settings',dayCategories:'lifeos_v24_day_categories',rules:'lifeos_v24_life_rules',engPhrases:'lifeos_eng_phrases',engRoleplays:'lifeos_eng_roleplays',engStories:'lifeos_eng_stories',engNetworking:'lifeos_eng_networking',engSelfPresentation:'lifeos_eng_self_presentation',careerEvidence:'lifeos_career_evidence',careerStories:'lifeos_career_stories',careerOpportunities:'lifeos_career_opportunities',careerProfile:'lifeos_career_profile',safetyMeta:'lifeos_safety_meta',preImportSnapshot:'lifeos_safety_preimport_snapshot',learning:'lifeos_learning_logs_v1',masterSyncMeta:'lifeos_master_sync_meta_v1',idealSideSections:'lifeos_ideal_side_sections_v1',uiPreferences:'lifeos_ui_preferences_v1',pinnedTaskFilter:'lifeos_pinned_task_filter_v2',planProjectCollapse:'lifeos_plan_project_collapse_state_v1',journalEntries:'lifeos_journal_entries_v1'};
 const LIFEOS_STORAGE_MANIFEST=[
@@ -12630,7 +12630,7 @@ window.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.body.classL
 <script id="lifeos-pwa-bootstrap">
 (function () {
   'use strict';
-  const LIFEOS_SW_VERSION = '2.14.85';
+  const LIFEOS_SW_VERSION = '2.14.86';
   const RELOAD_KEY = 'lifeos_sw_reload_' + LIFEOS_SW_VERSION;
   let controllerReloading = false;
   if ('serviceWorker' in navigator) {
@@ -20192,6 +20192,12 @@ document.addEventListener('keydown',resumeKeyboard,true);
     return id ? "#" + id.slice(-6) : "unbound";
   }
   function statusText(status) {
+    if (status && status.google && !status.identityMismatch && !status.conflict) {
+      if (status.checking || status.verifying) return "Syncing with Google Drive…";
+      if (status.error) return status.error;
+      if (status.ready) return "Up to date" + (status.lastSyncAt ? " · last saved " + masterSyncFriendlyDate(status.lastSyncAt, "") : "");
+      return "Connecting to Google Drive…";
+    }
     if (status && status.checking) return "Checking master sync…";
     if (status && status.identityMismatch) {
       return (
@@ -20255,7 +20261,10 @@ document.addEventListener('keydown',resumeKeyboard,true);
       masterFile = window.lifeosMasterFileStatus || {},
       sync = window.lifeosMasterSyncStatus || {};
     const statusEl = document.getElementById("lifeosFolderStatus");
-    if (statusEl) {
+    if (statusEl && !googleSync.enabled()) {
+      statusEl.textContent = "Not signed in";
+      statusEl.classList.remove("ready", "verifying", "error", "conflict");
+    } else if (statusEl) {
       statusEl.textContent = statusText({ ...folder, ...masterFile, ...sync });
       statusEl.classList.toggle(
         "ready",
@@ -20614,10 +20623,42 @@ document.addEventListener('keydown',resumeKeyboard,true);
     /* Binding a master file by hand makes that file the master again; Google stays signed in
        (no new code needed) and "Sign in with Google" switches back. */
     function suspend() { if (enabled()) { writeState({ enabled: false }); cache = null; } }
-    return { enabled: enabled, read: read, write: write, fileStatus: fileStatus, signIn: signIn, signOut: signOut, suspend: suspend };
+    function needsSignIn() { return !!readState().needsSignIn || (enabled() && !refreshToken()); }
+    return { enabled: enabled, needsSignIn: needsSignIn, read: read, write: write, fileStatus: fileStatus, signIn: signIn, signOut: signOut, suspend: suspend };
   })();
   window.lifeosGoogleSignIn = function () { return googleSync.signIn(); };
   window.lifeosGoogleSignOut = function () { return googleSync.signOut(); };
+  window.lifeosGoogleSyncState = function () { return { enabled: googleSync.enabled(), needsSignIn: googleSync.needsSignIn() }; };
+  /* v2.14.85: the Backup & restore dialog shows one Google Drive card instead of the master-file controls. */
+  window.lifeosGoogleCardHtml = function () {
+    const on = googleSync.enabled(), sync = window.lifeosMasterSyncStatus || {}, masterFile = window.lifeosMasterFileStatus || {};
+    const mismatchActions = on && sync.identityMismatch
+      ? '<button class="add-btn" type="button" onclick="lifeosMergeIntoSelectedMaster()">Merge this device data</button><button class="track-btn" type="button" onclick="lifeosUseSelectedMaster()">Use Google Drive copy</button>'
+      : "";
+    const conflictActions = on && sync.conflict && !sync.identityMismatch
+      ? '<button class="track-btn" type="button" onclick="lifeosUseCloudMaster()">Use Google Drive copy</button><button class="add-btn" type="button" onclick="lifeosReplaceCloudMaster()">Use this device</button>'
+      : "";
+    const status = on ? statusText({ ...masterFile, ...sync, google: true }) : "Not signed in";
+    const healthy = on && sync.ready && !sync.verifying && !sync.error && !sync.conflict && !sync.identityMismatch;
+    return (
+      '<section class="backup-folder-card master-sync-card lifeos-google-card">' +
+      '<div class="backup-folder-main"><div class="backup-folder-icon">↻</div><div class="backup-folder-copy">' +
+      "<h3>Google Drive backup</h3><p>" +
+      (on
+        ? "Your data is saved to the <b>LifeOS Sync</b> folder in your Google Drive automatically and stays in sync on every device you sign in on. Google Drive keeps earlier versions."
+        : "Sign in once and LifeOS saves your data to your Google Drive automatically, and keeps your phone and computer in sync.") +
+      "</p>" +
+      '<div id="lifeosFolderStatus" class="backup-folder-status ' + (healthy ? "ready" : "") + " " + (on && (sync.error || sync.identityMismatch) ? "error" : "") + " " + (on && (sync.conflict || sync.identityMismatch) ? "conflict" : "") + '">' +
+      esc(status) +
+      "</div></div></div>" +
+      '<div class="master-sync-actions">' +
+      (on
+        ? '<button id="lifeosGoogleButton" class="track-btn" type="button" onclick="lifeosGoogleSignOut()">Sign out of Google</button>'
+        : '<button id="lifeosGoogleButton" class="add-btn" type="button" onclick="lifeosGoogleSignIn()">Sign in with Google</button>') +
+      mismatchActions + conflictActions +
+      "</div></section>"
+    );
+  };
 
   window.lifeosFolderCardHtml = function () {
     const folder = window.lifeosFolderStatus || {},
@@ -21808,12 +21849,7 @@ document.addEventListener('keydown',resumeKeyboard,true);
           ? "Reconnect the exact master file to continue sync."
           : "Connect the exact shared master file used by the other device.",
       });
-    if (
-      (!masterFile.ready ||
-        (window.lifeosMasterSyncStatus || {}).masterMissing ||
-        (window.lifeosMasterSyncStatus || {}).identityMismatch) &&
-      !setupPromptShown
-    ) {
+    if ((window.lifeosMasterSyncStatus || {}).identityMismatch && !setupPromptShown) {
       setupPromptShown = true;
       setTimeout(function () {
         try {
@@ -21999,8 +22035,7 @@ window.renderSafetyBanners=function(){
  const masterSync=window.lifeosMasterSyncStatus||{};
  if(masterSync.identityMismatch)rows.push(`<div class="safety-banner-row danger"><span><b>Different master files are connected.</b> Sync is stopped until you merge this device into the selected master or use the selected master.</span><span class="safety-banner-actions"><button class="safety-banner-btn" onclick="openSafetyModal()">Resolve pairing</button></span></div>`);
  else if(masterSync.conflict)rows.push(`<div class="safety-banner-row danger"><span><b>Master sync conflict.</b> Choose the cloud copy or this device before automatic sync continues.</span><span class="safety-banner-actions"><button class="safety-banner-btn" onclick="openSafetyModal()">Resolve conflict</button></span></div>`);
- else if(masterSync.masterMissing||masterSync.needsPairing||masterSync.needsSetup)rows.push(`<div class="safety-banner-row warning"><span><b>Master sync needs the exact shared file.</b> Connect the same LifeOS-Master-Sync.json file on PC and mobile. Matching folder names are not enough.</span><span class="safety-banner-actions"><button class="safety-banner-btn" onclick="lifeosConnectExistingMaster()">Connect master</button><button class="safety-banner-btn" onclick="openSafetyModal()">Sync settings</button></span></div>`);
- else if(masterSync.error)rows.push(`<div class="safety-banner-row warning"><span><b>Master sync failed.</b> ${esc(masterSync.error)}</span><span class="safety-banner-actions"><button class="safety-banner-btn" onclick="lifeosSyncMasterNow()">Retry</button><button class="safety-banner-btn" onclick="openSafetyModal()">Sync settings</button></span></div>`);
+ else if(typeof window.lifeosGoogleSyncState==='function'&&window.lifeosGoogleSyncState().enabled&&window.lifeosGoogleSyncState().needsSignIn)rows.push(`<div class="safety-banner-row warning"><span><b>Google Drive backup is paused.</b> Sign in again to resume automatic backup.</span><span class="safety-banner-actions"><button class="safety-banner-btn" onclick="lifeosGoogleSignIn()">Sign in with Google</button></span></div>`);
  el.innerHTML=rows.join('');el.classList.toggle('show',rows.length>0);requestAnimationFrame(syncSafetyBannerOffset);
 };
 renderSafetyBanners=window.renderSafetyBanners;
@@ -22502,7 +22537,7 @@ window.hydrateLifeOSBackupDiagnostics=function(details){
 };
 window.renderSafetyModal=function(){
  const modal=document.getElementById('safetyModal');if(!modal)return;const meta=ensureSafetyMeta(),lastBackup=meta.lastBackupAt?new Date(meta.lastBackupAt).toLocaleString():'Never',snapshot=STORE.getItem(K.preImportSnapshot)!==null,report=state.safetyLastReport?'<div class="safety-report '+(state.safetyLastReport.ok?'':'fail')+'"><b>'+esc(state.safetyLastReport.title)+'</b><br>'+esc(state.safetyLastReport.message)+'</div>':'';
- modal.classList.add('open');modal.classList.remove('lifeos-dialog-preparing');modal.innerHTML='<div class="modal-box backup-restore-modal"><div class="modal-head"><div><b>Backup & restore</b><div class="mini-note">Protect your LifeOS data without loading technical details until you request them.</div></div><button class="icon-btn" onclick="closeModal(\'safetyModal\')">'+ICONS.close+'</button></div><div class="modal-body"><div class="backup-restore-intro"><h2>One master file across mobile and PC</h2><p>Select the same Google Drive or OneDrive folder on Android and desktop. LifeOS keeps LifeOS-Master-Sync.json current after data changes; dated manual and scheduled backups remain separate.</p></div>'+report+(typeof window.lifeosFolderCardHtml==='function'?window.lifeosFolderCardHtml():'')+'<div class="backup-restore-actions"><section class="backup-action-card"><div class="backup-action-icon">↓</div><h3>Back up data</h3><p>Save all LifeOS data in one backup file.</p><button class="add-btn" type="button" onclick="exportLifeOSBackup()">Create backup</button><span class="backup-action-meta">Last backup: '+esc(lastBackup)+'</span></section><section class="backup-action-card"><div class="backup-action-icon">↑</div><h3>Restore data</h3><p>Choose a LifeOS backup file from this or another device.</p><button class="track-btn" type="button" onclick="chooseLifeOSBackupFile()">Choose backup file</button><input class="safety-file-input" id="safetyImportFile" type="file" accept="application/json,.json" onchange="handleSafetyImportFile(event)"><span class="backup-action-meta">Your current data is protected with a one-time undo point before restore.</span></section></div>'+safetyPreviewHtml()+(snapshot?'<div class="backup-undo-row"><div><strong>Undo available</strong><span>Return to the data that existed before the most recent restore.</span></div><button class="task-form-cancel" type="button" onclick="undoLastSafetyImport()">Undo last restore</button></div>':'')+backupScheduleSummary(meta)+'<details class="backup-advanced" ontoggle="hydrateLifeOSBackupDiagnostics(this)"><summary>Advanced & diagnostics</summary><div class="backup-advanced-body"><div id="lifeosBackupDiagnosticsHost" class="lifeos-backup-diagnostics-host"><div class="lifeos-lazy-field-note">Open this section to calculate datastore counts and technical status.</div></div></div></details></div></div>';
+ modal.classList.add('open');modal.classList.remove('lifeos-dialog-preparing');modal.innerHTML='<div class="modal-box backup-restore-modal"><div class="modal-head"><div><b>Backup & restore</b><div class="mini-note">Keep your LifeOS data safe in your Google Drive.</div></div><button class="icon-btn" onclick="closeModal(\'safetyModal\')">'+ICONS.close+'</button></div><div class="modal-body">'+report+(typeof window.lifeosGoogleCardHtml==='function'?window.lifeosGoogleCardHtml():'')+safetyPreviewHtml()+(snapshot?'<div class="backup-undo-row"><div><strong>Undo available</strong><span>Return to the data that existed before the most recent restore.</span></div><button class="task-form-cancel" type="button" onclick="undoLastSafetyImport()">Undo last restore</button></div>':'')+'<details class="backup-advanced"'+(state.safetyImportPreview?' open':'')+'><summary>More options</summary><div class="backup-advanced-body"><div class="backup-restore-actions"><section class="backup-action-card"><div class="backup-action-icon">↓</div><h3>Back up data</h3><p>Save all LifeOS data in one backup file.</p><button class="add-btn" type="button" onclick="exportLifeOSBackup()">Create backup</button><span class="backup-action-meta">Last backup: '+esc(lastBackup)+'</span></section><section class="backup-action-card"><div class="backup-action-icon">↑</div><h3>Restore data</h3><p>Choose a LifeOS backup file from this or another device.</p><button class="track-btn" type="button" onclick="chooseLifeOSBackupFile()">Choose backup file</button><input class="safety-file-input" id="safetyImportFile" type="file" accept="application/json,.json" onchange="handleSafetyImportFile(event)"><span class="backup-action-meta">Your current data is protected with a one-time undo point before restore.</span></section></div></div></details></div></div>';
  if(state._lifeosBackupScheduleEditorOpen)window.openLifeOSAutoBackupEditor();setTimeout(function(){if(typeof window.refreshLifeOSFolderStatus==='function')window.refreshLifeOSFolderStatus();},0);
 };
 try{renderSafetyModal=window.renderSafetyModal}catch(_){}
@@ -31799,7 +31834,7 @@ try{
   if(github)github.body='Open LifeOS only from its permanent HTTPS GitHub Pages address. GitHub Pages is deployed by the repository workflow at .github/workflows/deploy-pages.yml. Every release package must retain that workflow, push the approved root site to main, and let the workflow upload and deploy the Pages artifact. Updating main without the workflow does not update the public site. Never upload LifeOS-Master-Sync.json, Shadowing media or recordings to GitHub.';
  }
 }catch(_ ){}
-try{document.title='LifeOS v2.14.85'}catch(_ ){}
+try{document.title='LifeOS v2.14.86'}catch(_ ){}
 })();</script>
 </body>
 </html>
