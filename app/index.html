@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LifeOS v2.14.85</title>
+<title>LifeOS v2.14.86</title>
 <meta name="theme-color" content="#221c14" />
 <meta name="application-name" content="LifeOS" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -8746,7 +8746,7 @@ const DEFAULT_TASKS=[
 ];
 const TEST_PACK_VERSION='v296_ideal_day_schedule';
 const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s));
-const APP_VERSION='2.14.85';
+const APP_VERSION='2.14.86';
 const BACKUP_SCHEMA_VERSION=1;
 const K={tasks:'lifeos_v24_tasks',logs:'lifeos_v24_logs',tags:'lifeos_v24_tags',tagProgressOrder:'lifeos_v24_tag_progress_order',foods:'lifeos_v24_foods',units:'lifeos_v24_units',settings:'lifeos_v24_settings',dayCategories:'lifeos_v24_day_categories',rules:'lifeos_v24_life_rules',engPhrases:'lifeos_eng_phrases',engRoleplays:'lifeos_eng_roleplays',engStories:'lifeos_eng_stories',engNetworking:'lifeos_eng_networking',engSelfPresentation:'lifeos_eng_self_presentation',careerEvidence:'lifeos_career_evidence',careerStories:'lifeos_career_stories',careerOpportunities:'lifeos_career_opportunities',careerProfile:'lifeos_career_profile',safetyMeta:'lifeos_safety_meta',preImportSnapshot:'lifeos_safety_preimport_snapshot',learning:'lifeos_learning_logs_v1',masterSyncMeta:'lifeos_master_sync_meta_v1',idealSideSections:'lifeos_ideal_side_sections_v1',uiPreferences:'lifeos_ui_preferences_v1',pinnedTaskFilter:'lifeos_pinned_task_filter_v2',planProjectCollapse:'lifeos_plan_project_collapse_state_v1',journalEntries:'lifeos_journal_entries_v1'};
 const LIFEOS_STORAGE_MANIFEST=[
@@ -12630,7 +12630,7 @@ window.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.body.classL
 <script id="lifeos-pwa-bootstrap">
 (function () {
   'use strict';
-  const LIFEOS_SW_VERSION = '2.14.85';
+  const LIFEOS_SW_VERSION = '2.14.86';
   const RELOAD_KEY = 'lifeos_sw_reload_' + LIFEOS_SW_VERSION;
   let controllerReloading = false;
   if ('serviceWorker' in navigator) {
@@ -31834,7 +31834,7 @@ try{
   if(github)github.body='Open LifeOS only from its permanent HTTPS GitHub Pages address. GitHub Pages is deployed by the repository workflow at .github/workflows/deploy-pages.yml. Every release package must retain that workflow, push the approved root site to main, and let the workflow upload and deploy the Pages artifact. Updating main without the workflow does not update the public site. Never upload LifeOS-Master-Sync.json, Shadowing media or recordings to GitHub.';
  }
 }catch(_ ){}
-try{document.title='LifeOS v2.14.85'}catch(_ ){}
+try{document.title='LifeOS v2.14.86'}catch(_ ){}
 })();</script>
 </body>
 </html>
