@@ -1,7 +1,7 @@
 'use strict';
-const LIFEOS_VERSION = '2.14.87';
-const CACHE = 'lifeos-v2.14.87';
-const VERSIONED_INDEX = './index.html?v=2.14.87';
+const LIFEOS_VERSION = '2.14.88';
+const CACHE = 'lifeos-v2.14.88';
+const VERSIONED_INDEX = './index.html?v=2.14.88';
 const CORE = [
   VERSIONED_INDEX,
   './offline.html',

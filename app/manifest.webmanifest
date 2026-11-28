@@ -2,7 +2,7 @@
   "name": "LifeOS",
   "short_name": "LifeOS",
   "id": "./",
-  "start_url": "./?v=2.14.87",
+  "start_url": "./?v=2.14.88",
   "scope": "./",
   "display": "standalone",
   "background_color": "#e9e3d8",
